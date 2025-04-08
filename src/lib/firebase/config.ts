@@ -3,13 +3,15 @@ import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
+// Doğrudan sabit değerleri kullanıyoruz
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyDi-ocPnlw8pc_gmkJORFPF2lUkj8Raz6w",
+  authDomain: "yeniapp2-105be.firebaseapp.com",
+  projectId: "yeniapp2-105be",
+  storageBucket: "yeniapp2-105be.firebasestorage.app",
+  messagingSenderId: "198254015679",
+  appId: "1:198254015679:web:1f645148e77bd8ec69820a",
+  measurementId: "G-5RY6PJVJPH"
 };
 
 // Firebase'i başlat
