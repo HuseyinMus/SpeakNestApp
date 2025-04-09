@@ -4,8 +4,8 @@ import "./globals.css";
 import { LanguageProvider } from "@/lib/context/LanguageContext";
 import { ToastProvider } from '@/lib/context/ToastContext';
 
-// Firebase yapılandırmasını import et
-import '@/lib/firebase/config';
+// Firebase import'unu kaldırıyoruz - artık client-side only olarak çalışacak
+// import '@/lib/firebase/config';
 
 const inter = Inter({ subsets: ["latin"] });
 

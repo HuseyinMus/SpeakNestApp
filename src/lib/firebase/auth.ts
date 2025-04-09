@@ -1,13 +1,17 @@
-import { auth, db } from './config';
+import { getFirebaseAuth, getFirestoreDb } from './config';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-
-// Google Auth Provider oluşturma
-const googleProvider = new GoogleAuthProvider();
 
 // Google ile giriş yapma
 export const signInWithGoogle = async () => {
   try {
+    // Firebase servislerini al
+    const auth = await getFirebaseAuth();
+    const db = await getFirestoreDb();
+    
+    // Google Auth Provider oluşturma
+    const googleProvider = new GoogleAuthProvider();
+    
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
     
