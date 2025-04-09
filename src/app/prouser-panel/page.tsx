@@ -1,28 +1,171 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { auth, db } from '@/lib/firebase/config';
 import { useRouter } from 'next/navigation';
-import { doc, getDoc, collection, query, where, getDocs, orderBy, limit, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
 import Image from 'next/image';
-import { Menu, X, Home, MessageCircle, Users, FileText, User, BarChart, Clock, Settings, LogOut, Calendar, CheckSquare, Plus, MinusCircle } from 'lucide-react';
+import { Menu, X, Home, MessageCircle, Users, User, BarChart, Clock, Settings, LogOut, Calendar, CheckSquare, Plus, MinusCircle } from 'lucide-react';
 import { useLanguage } from '@/lib/context/LanguageContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useToast } from '@/lib/context/ToastContext';
 import { Shimmer, ShimmerCard, ShimmerList } from '@/components/ui/Shimmer';
 
+interface User {
+  uid: string;
+  displayName: string | null;
+  email: string | null;
+  photoURL: string | null;
+}
+
+interface UserProfile {
+  displayName?: string;
+  firstName?: string;
+  lastName?: string;
+  photoURL?: string;
+  role?: string;
+}
+
+interface Meeting {
+  id: string;
+  title: string;
+  description: string;
+  startTime: Date;
+  level: string;
+  topic: string;
+  participantCount: number;
+  status: string;
+  participants: Array<{
+    id: string;
+    name: string;
+    email: string;
+  }>;
+  meetUrl?: string;
+  zoomMeetingId?: string;
+}
+
+interface FirebaseError extends Error {
+  code: string;
+}
+
 export default function ProUserPanel() {
   const { t } = useLanguage();
-  const [user, setUser] = useState<any>(null);
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [activeMeetings, setActiveMeetings] = useState<any[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [activeMeetings, setActiveMeetings] = useState<Meeting[]>([]);
   const [error, setError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  const router = useRouter();
   const toast = useToast();
+  
+  // Toplantı verilerini getir
+  const fetchMeetingData = useCallback(async (userId: string) => {
+    try {
+      console.log('ProUser ID:', userId);
+      
+      // Aktif toplantıları getir
+      const meetingsQuery = query(
+        collection(db, 'meetings'),
+        where('hostId', '==', userId),
+        where('status', '==', 'active'),
+        orderBy('startTime', 'asc')
+      );
+      
+      const meetingsSnapshot = await getDocs(meetingsQuery);
+      const meetingsData: Meeting[] = [];
+      
+      meetingsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        meetingsData.push({
+          id: doc.id,
+          title: data.title,
+          description: data.description,
+          startTime: data.startTime.toDate(), // Firestore Timestamp'i Date'e çevir
+          level: data.level,
+          topic: data.topic,
+          participantCount: data.participantCount,
+          status: data.status,
+          participants: data.participants || [],
+          meetUrl: data.meetUrl,
+          zoomMeetingId: data.zoomMeetingId
+        });
+      });
+      
+      setActiveMeetings(meetingsData);
+      
+    } catch (err: unknown) {
+      console.error('Toplantı verileri alınamadı:', err);
+      // Hata mesajını daha kullanıcı dostu hale getir
+      if (err instanceof Error && 'code' in err && (err as FirebaseError).code === 'permission-denied') {
+        console.log('Yetki hatası: Meetings koleksiyonuna erişim izni yok');
+        setError(t('meetingsAccessError', 'Toplantılara erişim izniniz yok.'));
+      } else {
+        setError(t('meetingsDataError', 'Toplantı verileri alınırken bir hata oluştu.'));
+      }
+    }
+  }, [t, setError]);
+  
+  // Kullanıcı profilini getir
+  const fetchUserProfile = useCallback(async (userId: string) => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        setUserProfile(userData);
+        
+        // Kullanıcı proUser değilse yönlendir
+        if (userData.role !== 'proUser') {
+          if (userData.role === 'admin') {
+            router.push('/dashboard');
+          } else if (userData.role === 'teacher') {
+            router.push('/teacher-panel');
+          } else if (userData.role === 'student') {
+            router.push('/student-panel');
+          } else {
+            router.push('/');
+          }
+          return;
+        }
+        
+        // Aktif toplantıları getir
+        await fetchMeetingData(userId);
+      } else {
+        setError(t('userProfileNotFound', 'Kullanıcı profili bulunamadı.'));
+      }
+    } catch (err) {
+      console.error('Profil verisi alınamadı:', err);
+      setError(t('profileDataError', 'Profil verileri alınırken bir hata oluştu.'));
+    }
+  }, [router, t, fetchMeetingData, setError]);
+  
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const unsubscribe = auth.onAuthStateChanged(async (user: User | null) => {
+          if (user) {
+            setUser(user);
+            await fetchUserProfile(user.uid);
+          } else {
+            // Kullanıcı giriş yapmamışsa login sayfasına yönlendir
+            router.push('/login');
+          }
+          setLoading(false);
+        });
+        
+        return () => unsubscribe();
+      } catch (err) {
+        console.error('Auth kontrolü sırasında hata:', err);
+        setError(t('sessionCheckError', 'Toplantı kontrolü sırasında bir hata oluştu.'));
+        setLoading(false);
+      }
+    };
+    
+    checkAuth();
+  }, [router, fetchUserProfile, t]);
   
   // Toplantı seviyesi için çevirileri manuel olarak yapan yardımcı fonksiyon
   const getLevelTranslation = (level: string) => {
@@ -64,102 +207,6 @@ export default function ProUserPanel() {
     }
   };
   
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const unsubscribe = auth.onAuthStateChanged(async (user: any) => {
-          if (user) {
-            setUser(user);
-            await fetchUserProfile(user.uid);
-          } else {
-            // Kullanıcı giriş yapmamışsa login sayfasına yönlendir
-            router.push('/login');
-          }
-          setLoading(false);
-        });
-        
-        return () => unsubscribe();
-      } catch (err) {
-        console.error('Auth kontrolü sırasında hata:', err);
-        setError(t('sessionCheckError', 'Toplantı kontrolü sırasında bir hata oluştu.'));
-        setLoading(false);
-      }
-    };
-    
-    checkAuth();
-  }, [router]);
-  
-  // Kullanıcı profilini getir
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        setUserProfile(userData);
-        
-        // Kullanıcı proUser değilse yönlendir
-        if (userData.role !== 'proUser') {
-          if (userData.role === 'admin') {
-            router.push('/dashboard');
-          } else if (userData.role === 'teacher') {
-            router.push('/teacher-panel');
-          } else if (userData.role === 'student') {
-            router.push('/student-panel');
-          } else {
-            router.push('/');
-          }
-          return;
-        }
-        
-        // Aktif toplantıları getir
-        await fetchMeetingData(userId);
-      } else {
-        setError(t('userProfileNotFound', 'Kullanıcı profili bulunamadı.'));
-      }
-    } catch (err) {
-      console.error('Profil verisi alınamadı:', err);
-      setError(t('profileDataError', 'Profil verileri alınırken bir hata oluştu.'));
-    }
-  };
-  
-  // Toplantı verilerini getir
-  const fetchMeetingData = async (userId: string) => {
-    try {
-      console.log('ProUser ID:', userId);
-      
-      // Aktif toplantıları getir
-      const meetingsQuery = query(
-        collection(db, 'meetings'),
-        where('hostId', '==', userId),
-        where('status', '==', 'active'),
-        orderBy('startTime', 'asc')
-      );
-      
-      const meetingsSnapshot = await getDocs(meetingsQuery);
-      const meetingsData: any[] = [];
-      
-      meetingsSnapshot.forEach((doc) => {
-        meetingsData.push({
-          id: doc.id,
-          ...doc.data()
-        });
-      });
-      
-      setActiveMeetings(meetingsData);
-      
-    } catch (err: any) {
-      console.error('Toplantı verileri alınamadı:', err);
-      // Hata mesajını daha kullanıcı dostu hale getir
-      if (err.code === 'permission-denied') {
-        console.log('Yetki hatası: Meetings koleksiyonuna erişim izni yok');
-        setError(t('meetingsAccessError', 'Toplantılara erişim izniniz yok.'));
-      } else {
-        setError(t('meetingsDataError', 'Toplantı verileri alınırken bir hata oluştu.'));
-      }
-    }
-  };
-
   const handleLogout = async () => {
     try {
       await auth.signOut();
@@ -406,8 +453,8 @@ export default function ProUserPanel() {
                           </span>
                           <span className="px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium flex items-center gap-1">
                             <Clock size={12} />
-                            {meeting.startTime?.toDate().toLocaleDateString() || t('notSpecified', 'Belirtilmemiş')}, 
-                            {meeting.startTime?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || ''}
+                            {meeting.startTime instanceof Date ? meeting.startTime.toLocaleDateString() : t('notSpecified', 'Belirtilmemiş')}, 
+                            {meeting.startTime instanceof Date ? meeting.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                           </span>
                         </div>
                         
@@ -426,8 +473,10 @@ export default function ProUserPanel() {
                                 <button 
                                   className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-2 py-1 rounded-md transition-colors"
                                   onClick={() => {
-                                    navigator.clipboard.writeText(meeting.meetUrl);
-                                    toast.success(t('meetingLinkCopied', 'Toplantı bağlantısı panoya kopyalandı'));
+                                    if (meeting.meetUrl) {
+                                      navigator.clipboard.writeText(meeting.meetUrl);
+                                      toast.success(t('meetingLinkCopied', 'Toplantı bağlantısı panoya kopyalandı'));
+                                    }
                                   }}
                                 >
                                   {t('copyMeetingLink', 'Kopyala')}
@@ -520,6 +569,9 @@ export default function ProUserPanel() {
         );
       
       case 'create-meeting':
+        if (!userProfile) {
+          return <div>{t('profileNotFound', 'Profil bulunamadı')}</div>;
+        }
         return <CreateMeetingForm 
           userId={user?.uid} 
           userProfile={userProfile} 
@@ -576,8 +628,8 @@ export default function ProUserPanel() {
                         </span>
                         <span className="px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium flex items-center gap-1">
                           <Clock size={12} />
-                          {meeting.startTime?.toDate().toLocaleDateString() || t('notSpecified', 'Belirtilmemiş')}, 
-                          {meeting.startTime?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || ''}
+                          {meeting.startTime instanceof Date ? meeting.startTime.toLocaleDateString() : t('notSpecified', 'Belirtilmemiş')}, 
+                          {meeting.startTime instanceof Date ? meeting.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                         </span>
                       </div>
                       <div className="flex justify-end gap-2">
@@ -629,7 +681,6 @@ export default function ProUserPanel() {
   }
 }
 
-// Toplantı Formu için tip tanımları
 interface MeetingFormData {
   title: string;
   description: string;
@@ -647,16 +698,13 @@ interface MeetingFormData {
 
 interface CreateMeetingFormProps {
   userId: string | undefined;
-  userProfile: any;
+  userProfile: UserProfile;
   setActiveTab: (tab: string) => void;
 }
 
-// Toplantı Oluşturma Formu Bileşeni
 function CreateMeetingForm({ userId, userProfile, setActiveTab }: CreateMeetingFormProps) {
   const { t } = useLanguage();
   const toast = useToast();
-  const router = useRouter();
-  const [isZoomConnected, setIsZoomConnected] = useState(false);
   
   // Form State
   const [formData, setFormData] = useState<MeetingFormData>({
@@ -747,23 +795,16 @@ function CreateMeetingForm({ userId, userProfile, setActiveTab }: CreateMeetingF
         throw new Error(errorMsg);
       }
       
-      // Tarih bilgisini manuel olarak parçalara ayırarak oluştur
+      // Tarih bilgisini oluştur
       const [year, month, day] = formData.date.split('-').map(Number);
       const [hours, minutes] = formData.time.split(':').map(Number);
       
-      // Yeni tarih nesnesi oluştur
-      const meetingDateTime = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0));
+      // Yeni tarih nesnesi oluştur - tarayıcı zaman diliminde
+      const meetingDateTime = new Date(year, month - 1, day, hours, minutes);
       
-      console.log('Oluşturulan tarih bilgileri:', {
-        date: formData.date,
-        time: formData.time,
-        parsedDate: `${year}-${month}-${day}`,
-        parsedTime: `${hours}:${minutes}`,
-        utcDate: meetingDateTime.toISOString(),
-        localDate: meetingDateTime.toString()
-      });
-      
-      if (meetingDateTime < new Date()) {
+      // Geçerli zamanla karşılaştır
+      const now = new Date();
+      if (meetingDateTime < now) {
         const errorMsg = t('futureDateRequired', 'Toplantı tarihi gelecekte olmalıdır.');
         toast.error(errorMsg);
         throw new Error(errorMsg);
@@ -785,22 +826,14 @@ function CreateMeetingForm({ userId, userProfile, setActiveTab }: CreateMeetingF
           throw new Error('Form bilgilerini kontrol edin. Başlık, açıklama ve tarih alanları zorunludur.');
         }
         
-        // Zoom toplantısı oluştur
-        console.log('ZoomService.createMeeting çağrılıyor:', {
+        const zoomResult = await ZoomService.createMeeting({
           title: formData.title,
-          descriptionLength: formData.description ? formData.description.length : 0,
+          description: formData.description || "Açıklama yok",
           startTime: meetingDateTime.toISOString(),
-          dateIsValid: meetingDateTime instanceof Date && !isNaN(meetingDateTime.getTime())
+          duration: 60
         });
         
-        const zoomResult = await ZoomService.createMeeting(
-          formData.title,
-          formData.description || "Açıklama yok", // Boş olmamalı
-          meetingDateTime.toISOString(), // Direkt ISO formatında string gönder
-          60 // varsayılan 1 saat
-        );
-        
-        if (zoomResult && zoomResult.joinUrl && zoomResult.meetingId) {
+        if (zoomResult && zoomResult.join_url && zoomResult.id) {
           // Toplantıyı Firestore'a kaydet
           const meetingRef = await addDoc(collection(db, 'meetings'), {
             title: formData.title,
@@ -816,8 +849,8 @@ function CreateMeetingForm({ userId, userProfile, setActiveTab }: CreateMeetingF
             hostPhotoURL: userProfile?.photoURL || null,
             status: 'active',
             participants: [],
-            meetUrl: zoomResult.joinUrl,
-            zoomMeetingId: zoomResult.meetingId,
+            meetUrl: zoomResult.join_url,
+            zoomMeetingId: zoomResult.id,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
           });
@@ -848,9 +881,9 @@ function CreateMeetingForm({ userId, userProfile, setActiveTab }: CreateMeetingF
         } else {
           throw new Error('Zoom toplantısı oluşturulamadı');
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Toplantı oluşturulurken hata:', error);
-        const errorMsg = error.message || t('meetingCreateError', 'Toplantı oluşturulurken bir hata oluştu.');
+        const errorMsg = error instanceof Error ? error.message : t('meetingCreateError', 'Toplantı oluşturulurken bir hata oluştu.');
         toast.error(errorMsg);
         
         setFormData(prev => ({ 
@@ -859,9 +892,9 @@ function CreateMeetingForm({ userId, userProfile, setActiveTab }: CreateMeetingF
           error: errorMsg
         }));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Toplantı oluşturulurken hata:', error);
-      const errorMsg = error.message || t('meetingCreateError', 'Toplantı oluşturulurken bir hata oluştu.');
+      const errorMsg = error instanceof Error ? error.message : t('meetingCreateError', 'Toplantı oluşturulurken bir hata oluştu.');
       
       setFormData(prev => ({ 
         ...prev, 
@@ -869,16 +902,6 @@ function CreateMeetingForm({ userId, userProfile, setActiveTab }: CreateMeetingF
         error: errorMsg
       }));
     }
-  };
-  
-  const handleZoomConnect = () => {
-    const ZOOM_CLIENT_ID = 'j4qbt1vUQOCJpmwWwaDt8g';
-    const REDIRECT_URI = `${process.env.NEXT_PUBLIC_APP_URL}/api/zoom/callback`;
-    const RESPONSE_TYPE = 'code';
-    
-    const authUrl = `https://zoom.us/oauth/authorize?response_type=${RESPONSE_TYPE}&client_id=${ZOOM_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
-    
-    window.location.href = authUrl;
   };
   
   // Konu seçenekleri
@@ -916,18 +939,6 @@ function CreateMeetingForm({ userId, userProfile, setActiveTab }: CreateMeetingF
         <p className="text-white/80">{t('createMeetingDescription', 'Yeni bir İngilizce pratik toplantısı oluşturun ve konuşma sunucusu olarak katılımcılara yardımcı olun.')}</p>
       </div>
       
-      {!isZoomConnected && (
-        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p className="text-yellow-700 mb-2">Toplantı oluşturmak için önce Zoom ile bağlanmanız gerekiyor.</p>
-          <button
-            onClick={handleZoomConnect}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors"
-          >
-            Zoom ile Bağlan
-          </button>
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Başlık ve Açıklama */}
         <div className="grid md:grid-cols-2 gap-6">

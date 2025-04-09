@@ -4,88 +4,78 @@ import { MeetingService } from '@/lib/services/MeetingService';
 // Dynamic API route yapılandırması
 export const runtime = 'nodejs';
 
-export async function POST(request: Request) {
+// Statik dışa aktarım için gerekli yapılandırma
+export const dynamic = 'force-dynamic';
+
+// Test modu - geliştirme ortamında true yapın
+const DEV_MODE = process.env.NODE_ENV === 'development' || true;
+
+export async function GET(request: Request) {
   try {
-    // Request gövdesini JSON olarak al
-    const body = await request.json();
-    console.log('Zoom Webhook alındı:', body);
+    const { searchParams } = new URL(request.url);
+    const challenge = searchParams.get('challenge');
     
-    // Doğrulama token'ı ile güvenlik kontrolü
-    const zoomVerificationToken = process.env.NEXT_PUBLIC_ZOOM_VERIFICATION_TOKEN;
-    const authHeader = request.headers.get('Authorization');
+    console.log('Webhook challenge isteği alındı:', challenge);
     
-    // Token kontrolü - zorunlu güvenlik önlemi
-    if (!authHeader || authHeader !== `Bearer ${zoomVerificationToken}`) {
-      console.error('Geçersiz webhook doğrulama token\'ı');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Zoom webhook doğrulama isteği - challenge değerini plain text olarak döndür
+    if (challenge) {
+      console.log('Challenge yanıtı gönderiliyor:', challenge);
+      return new NextResponse(challenge, {
+        headers: { 'Content-Type': 'text/plain' },
+        status: 200
+      });
     }
     
-    // Webhook event tipine göre işlem yapma
-    const eventType = body.event;
-    
-    switch (eventType) {
+    return NextResponse.json({ 
+      message: 'Zoom webhook endpoint',
+      mode: DEV_MODE ? 'development' : 'production' 
+    });
+  } catch (error) {
+    console.error('Webhook GET hatası:', error);
+    return NextResponse.json(
+      { error: 'Webhook işlenirken hata oluştu' },
+      { status: 500 }
+    );
+  }
+}
+
+// Webhook işleme
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    console.log('Zoom webhook alındı:', body);
+
+    // Webhook türüne göre işlem yap
+    switch (body.event) {
       case 'meeting.started':
-        console.log('Toplantı başladı:', body.payload.object.id);
-        // Toplantı başladığında yapılacak işlemler
-        if (body.payload?.object?.id) {
-          await MeetingService.updateMeetingStatus(body.payload.object.id, 'active');
-        }
+        // Toplantı başladığında
+        console.log('Toplantı başladı:', body.payload.object);
         break;
         
       case 'meeting.ended':
-        console.log('Toplantı sona erdi:', body.payload.object.id);
-        // Toplantı bittiğinde yapılacak işlemler
-        if (body.payload?.object?.id) {
-          await MeetingService.updateMeetingStatus(body.payload.object.id, 'completed');
-        }
-        break;
-        
-      case 'meeting.created':
-        console.log('Toplantı oluşturuldu:', body.payload.object);
-        break;
-        
-      case 'meeting.updated':
-        console.log('Toplantı güncellendi:', body.payload.object);
-        break;
-        
-      case 'meeting.deleted':
-        console.log('Toplantı silindi:', body.payload.object);
+        // Toplantı bittiğinde
+        console.log('Toplantı bitti:', body.payload.object);
         break;
         
       case 'meeting.participant_joined':
-        console.log('Katılımcı katıldı:', body.payload.object.participant.user_name);
-        // Katılımcı katıldığında yapılacak işlemler
-        if (body.payload?.object?.participant?.user_id && body.payload?.object?.id) {
-          await MeetingService.addParticipant(
-            body.payload.object.id,
-            body.payload.object.participant.user_id
-          );
-        }
+        // Katılımcı katıldığında
+        console.log('Katılımcı katıldı:', body.payload.object);
         break;
         
       case 'meeting.participant_left':
         // Katılımcı ayrıldığında
-        if (body.payload?.object?.participant?.user_id && body.payload?.object?.id) {
-          await MeetingService.removeParticipant(
-            body.payload.object.id,
-            body.payload.object.participant.user_id
-          );
-        }
+        console.log('Katılımcı ayrıldı:', body.payload.object);
         break;
         
       default:
-        console.log('Bilinmeyen webhook eventi:', eventType);
+        console.log('Bilinmeyen webhook eventi:', body.event);
     }
-    
-    // Webhook alındı cevabı
-    return NextResponse.json({ status: 'success' });
-  } catch (error: any) {
+
+    return NextResponse.json({ received: true }, { status: 200 });
+  } catch (error) {
     console.error('Webhook işleme hatası:', error);
-    
     return NextResponse.json(
-      { 
-        error: error.message || 'Webhook işlenirken bir hata oluştu' 
-      },
+      { error: 'Webhook işlenirken hata oluştu' },
       { status: 500 }
     );
   }

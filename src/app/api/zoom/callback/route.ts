@@ -4,6 +4,10 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+// Zoom API bilgileri
+const ZOOM_CLIENT_ID = 'j4qbt1vUQOCJpmwWwaDt8g';
+const ZOOM_CLIENT_SECRET = 'SmfLM35kaHUsKDJZWQbXor7j0kt90gUU';
+
 // OAuth callback işleme
 export async function GET(request: Request) {
   try {
@@ -12,8 +16,12 @@ export async function GET(request: Request) {
     const challenge = searchParams.get('challenge');
     const error = searchParams.get('error');
     const error_description = searchParams.get('error_description');
+    
+    // Mevcut URL'den origin bilgisini al
+    const origin = new URL(request.url).origin;
 
     console.log('Gelen parametreler:', { code, challenge, error, error_description });
+    console.log('Request origin:', origin);
 
     // Eğer error varsa, hata döndür
     if (error) {
@@ -26,6 +34,7 @@ export async function GET(request: Request) {
       console.log('Challenge isteği alındı:', challenge);
       return new NextResponse(challenge, {
         headers: { 'Content-Type': 'text/plain' },
+        status: 200
       });
     }
 
@@ -36,20 +45,20 @@ export async function GET(request: Request) {
     }
 
     console.log('Token almaya çalışılıyor...');
-    console.log('Client ID:', process.env.NEXT_PUBLIC_ZOOM_CLIENT_ID);
-    console.log('Redirect URI:', `${process.env.NEXT_PUBLIC_APP_URL}/api/zoom/callback`);
+    console.log('Client ID:', ZOOM_CLIENT_ID);
+    console.log('Redirect URI:', `${origin}/api/zoom/callback`);
 
     // Token al
     const tokenResponse = await fetch('https://zoom.us/oauth/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${Buffer.from(`${process.env.NEXT_PUBLIC_ZOOM_CLIENT_ID}:${process.env.NEXT_PUBLIC_ZOOM_CLIENT_SECRET}`).toString('base64')}`,
+        'Authorization': `Basic ${Buffer.from(`${ZOOM_CLIENT_ID}:${ZOOM_CLIENT_SECRET}`).toString('base64')}`,
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code: code,
-        redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/zoom/callback`,
+        redirect_uri: `${origin}/api/zoom/callback`,
       }),
     });
 
@@ -69,14 +78,14 @@ export async function GET(request: Request) {
     // Başarılı yönlendirme
     return NextResponse.redirect(new URL('/prouser-panel', request.url));
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('OAuth callback detaylı hata:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
+      message: error instanceof Error ? error.message : 'Bilinmeyen hata',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : 'UnknownError'
     });
     // Hata durumunda ana sayfaya yönlendir
-    return NextResponse.redirect(new URL(`/?error=oauth_failed&message=${encodeURIComponent(error.message)}`, request.url));
+    return NextResponse.redirect(new URL(`/?error=oauth_failed&message=${encodeURIComponent(error instanceof Error ? error.message : 'Bilinmeyen hata')})`, request.url));
   }
 }
 
