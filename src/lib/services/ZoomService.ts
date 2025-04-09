@@ -1,59 +1,46 @@
-export class ZoomService {
-  // API rotalarımızı kullanacak şekilde değiştiriyoruz
-  private static API_BASE = '/api/zoom';
+import { sign } from 'jsonwebtoken';
 
+const API_BASE = '/api/zoom';
+const ZOOM_API_KEY = 'j4qbt1vUQOCJpmwWwaDt8g';
+const ZOOM_API_SECRET = 'SmfLM35kaHUsKDJZWQbXor7j0kt90gUU';
+
+// JWT token oluştur
+function generateZoomJWT(): string {
+  const payload = {
+    iss: ZOOM_API_KEY,
+    exp: Math.floor(Date.now() / 1000) + 60 * 60, // 1 saat geçerli
+  };
+
+  return sign(payload, ZOOM_API_SECRET);
+}
+
+export class ZoomService {
   /**
    * Zoom toplantısı oluşturur
    */
-  static async createMeeting(
-    title: string,
-    description: string,
-    startTime: Date,
-    duration: number = 60
-  ) {
+  static async createMeeting(params: {
+    title: string;
+    description?: string;
+    startTime: Date | string;
+    duration?: number;
+  }): Promise<ZoomMeetingResponse> {
     try {
-      // Debug: Parametreleri ve tiplerini kontrol et
-      console.log('ZoomService.createMeeting parametreleri:', {
-        title: typeof title === 'undefined' ? 'undefined' : title,
-        description: typeof description === 'undefined' ? 'undefined' : description,
-        startTime: startTime instanceof Date ? startTime.toISOString() : 'geçersiz tarih',
-        duration
-      });
-
-      // Parametreleri kontrol et
-      if (!title || !description || !startTime) {
-        throw new Error('Gerekli alanlar eksik: title, description ve startTime zorunludur');
-      }
-
-      // Debug: API isteği içeriği
-      const requestBody = {
-        title,
-        description,
-        startTime: startTime.toISOString(),
-        duration,
-      };
-      console.log('ZoomService API isteği:', requestBody);
-
-      const response = await fetch(`${this.API_BASE}/meetings`, {
+      const response = await fetch(`${API_BASE}/meetings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${generateZoomJWT()}`,
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(params),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Zoom toplantısı oluşturulamadı');
+        const error = await response.json();
+        throw new Error(`Zoom toplantısı oluşturulamadı: ${error.message}`);
       }
 
-      if (!data.joinUrl || !data.meetingId) {
-        throw new Error('Toplantı yanıtında gerekli bilgiler eksik');
-      }
-
-      return data;
-    } catch (error: any) {
+      return await response.json();
+    } catch (error) {
       console.error('Zoom toplantısı oluşturma hatası:', error);
       throw error;
     }
@@ -62,29 +49,52 @@ export class ZoomService {
   /**
    * Zoom toplantı bilgilerini getirir
    */
-  static async getMeeting(meetingId: string): Promise<any> {
-    try {
-      if (!meetingId) {
-        throw new Error('Meeting ID gerekli');
-      }
+  static async getMeeting(meetingId: string): Promise<ZoomMeetingResponse> {
+    if (!meetingId) {
+      throw new Error('Meeting ID gerekli');
+    }
 
-      const response = await fetch(`${this.API_BASE}/meetings/${meetingId}`, {
-        method: 'GET',
+    try {
+      const response = await fetch(`${API_BASE}/meetings/${meetingId}`, {
         headers: {
-          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${generateZoomJWT()}`,
         },
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Toplantı bilgileri alınamadı');
+        const error = await response.json();
+        throw new Error(`Toplantı bilgisi alınamadı: ${error.message}`);
       }
 
-      return data;
+      return await response.json();
     } catch (error) {
-      console.error('Toplantı bilgileri alma hatası:', error);
+      console.error('Toplantı bilgisi alma hatası:', error);
       throw error;
     }
   }
+}
+
+// Zoom toplantı yanıt tipi
+interface ZoomMeetingResponse {
+  id?: string;
+  topic?: string;
+  start_time?: string;
+  duration?: number;
+  timezone?: string;
+  agenda?: string;
+  join_url?: string;
+  // Diğer olası alanlar için spesifik tip tanımları
+  host_email?: string;
+  status?: string;
+  type?: number;
+  start_url?: string;
+  password?: string;
+  settings?: {
+    host_video?: boolean;
+    participant_video?: boolean;
+    join_before_host?: boolean;
+    mute_upon_entry?: boolean;
+    waiting_room?: boolean;
+    [key: string]: boolean | string | number | undefined;
+  };
 } 

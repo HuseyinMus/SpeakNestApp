@@ -1,16 +1,26 @@
 import { NextResponse } from 'next/server';
 
 // Statik dışa aktarım için gerekli yapılandırma
-export const dynamic = 'force-static';
-export const revalidate = false;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
+// OAuth callback işleme
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
-    
+    const challenge = searchParams.get('challenge');
+
+    // Eğer challenge varsa, webhook doğrulama isteği
+    if (challenge) {
+      return new NextResponse(challenge, {
+        headers: { 'Content-Type': 'text/plain' },
+      });
+    }
+
+    // Eğer code yoksa hata döndür
     if (!code) {
-      throw new Error('Authorization code not found');
+      throw new Error('Authorization code bulunamadı');
     }
 
     // Token al
@@ -28,16 +38,62 @@ export async function GET(request: Request) {
     });
 
     if (!tokenResponse.ok) {
-      throw new Error('Token alınamadı');
+      const errorData = await tokenResponse.json();
+      console.error('Token alma hatası:', errorData);
+      throw new Error(`Token alınamadı: ${errorData.message || 'Bilinmeyen hata'}`);
     }
 
-    const tokenData = await tokenResponse.json();
-    console.log('Token alındı:', tokenData);
+    await tokenResponse.json(); // Sadece response'u tüketmek için
+    console.log('Token başarıyla alındı');
 
-    // Kullanıcıyı ana sayfaya yönlendir
-    return NextResponse.redirect(new URL('/', request.url));
+    // Başarılı yönlendirme
+    return NextResponse.redirect(new URL('/prouser-panel', request.url));
+
   } catch (error) {
-    console.error('OAuth callback error:', error);
-    return NextResponse.json({ status: 'error', message: error.message }, { status: 500 });
+    console.error('OAuth callback hatası:', error);
+    // Hata durumunda ana sayfaya yönlendir
+    return NextResponse.redirect(new URL('/?error=oauth_failed', request.url));
+  }
+}
+
+// Webhook işleme
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    console.log('Zoom webhook alındı:', body);
+
+    // Webhook türüne göre işlem yap
+    switch (body.event) {
+      case 'meeting.started':
+        // Toplantı başladığında
+        console.log('Toplantı başladı:', body.payload.object);
+        break;
+        
+      case 'meeting.ended':
+        // Toplantı bittiğinde
+        console.log('Toplantı bitti:', body.payload.object);
+        break;
+        
+      case 'meeting.participant_joined':
+        // Katılımcı katıldığında
+        console.log('Katılımcı katıldı:', body.payload.object);
+        break;
+        
+      case 'meeting.participant_left':
+        // Katılımcı ayrıldığında
+        console.log('Katılımcı ayrıldı:', body.payload.object);
+        break;
+        
+      default:
+        console.log('Bilinmeyen webhook eventi:', body.event);
+    }
+
+    return NextResponse.json({ received: true });
+  } catch (error) {
+    console.error('Webhook işleme hatası:', error);
+    return NextResponse.json(
+      { error: 'Webhook işlenirken hata oluştu' },
+      { status: 500 }
+    );
   }
 } 

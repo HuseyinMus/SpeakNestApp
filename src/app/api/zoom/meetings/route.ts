@@ -1,132 +1,118 @@
 import { NextResponse } from 'next/server';
+import { sign } from 'jsonwebtoken';
 
-// Dynamic API route yapılandırması - edge runtime kullanma
+// Dynamic API route yapılandırması
 export const runtime = 'nodejs';
+
+const ZOOM_API_KEY = 'j4qbt1vUQOCJpmwWwaDt8g';
+const ZOOM_API_SECRET = 'SmfLM35kaHUsKDJZWQbXor7j0kt90gUU';
+
+// JWT token oluştur
+function generateZoomJWT(): string {
+  const payload = {
+    iss: ZOOM_API_KEY,
+    exp: Math.floor(Date.now() / 1000) + 60 * 60, // 1 saat geçerli
+  };
+
+  return sign(payload, ZOOM_API_SECRET);
+}
 
 export async function POST(request: Request) {
   try {
-    // Request body'yi al ve log'la
-    const body = await request.json();
-    console.log('Zoom API isteği alındı:', body);
-    
-    // Gerekli alanların kontrolü
-    if (!body.title || !body.description || !body.startTime) {
-      console.error("Eksik alanlar:", { 
-        title: !!body.title, 
-        description: !!body.description, 
-        startTime: !!body.startTime 
-      });
+    const { title, description, startTime, duration = 60 } = await request.json();
+
+    if (!title || !startTime) {
       return NextResponse.json(
-        { error: "Gerekli alanlar eksik: title, description ve startTime zorunludur" },
+        { error: 'Başlık ve başlangıç zamanı gerekli' },
         { status: 400 }
       );
     }
-    
-    // String olarak startTime'ı Date'e çevir
-    let startDate: Date;
-    try {
-      console.log("startTime değeri:", body.startTime);
-      console.log("startTime tipi:", typeof body.startTime);
-      
-      startDate = new Date(body.startTime);
-      
-      console.log("Oluşturulan tarih:", startDate);
-      console.log("Tarih ISO string:", startDate.toISOString());
-      console.log("Tarih geçerli mi:", !isNaN(startDate.getTime()));
-      
-      if (isNaN(startDate.getTime())) {
-        throw new Error("Geçersiz tarih formatı");
-      }
-    } catch (error) {
-      console.error("Tarih dönüştürme hatası:", error);
-      return NextResponse.json(
-        { error: "Geçersiz başlangıç zamanı formatı" },
-        { status: 400 }
-      );
-    }
-    
-    // Önce token alalım
-    console.log('Zoom token alınıyor...');
-    
-    const tokenResponse = await fetch('https://zoom.us/oauth/token', {
+
+    // Zoom API'ye istek at
+    const response = await fetch('https://api.zoom.us/v2/users/me/meetings', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${generateZoomJWT()}`,
       },
-      body: new URLSearchParams({
-        grant_type: 'account_credentials',
-        account_id: process.env.NEXT_PUBLIC_ZOOM_ACCOUNT_ID || '',
-        client_id: process.env.NEXT_PUBLIC_ZOOM_CLIENT_ID || '',
-        client_secret: process.env.NEXT_PUBLIC_ZOOM_CLIENT_SECRET || '',
+      body: JSON.stringify({
+        topic: title,
+        type: 2, // Scheduled meeting
+        start_time: new Date(startTime).toISOString(),
+        duration: duration,
+        timezone: 'Europe/Istanbul',
+        agenda: description,
+        settings: {
+          host_video: true,
+          participant_video: true,
+          join_before_host: true,
+          mute_upon_entry: false,
+          waiting_room: false,
+          auto_recording: 'none',
+        },
       }),
     });
 
-    if (!tokenResponse.ok) {
-      const tokenError = await tokenResponse.json();
-      console.error('Token alınamadı:', tokenError);
-      throw new Error(`Token alınamadı: ${JSON.stringify(tokenError)}`);
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Zoom API hatası:', error);
+      return NextResponse.json(
+        { error: 'Toplantı oluşturulamadı: ' + error.message },
+        { status: response.status }
+      );
     }
 
-    const tokenData = await tokenResponse.json();
-    console.log('Token alındı');
-
-    // Toplantı oluştur
-    const { title, description, duration } = body;
-    
-    // Zoom API isteği oluştur
-    const meetingData = {
-      topic: title,
-      type: 2, // Scheduled meeting
-      start_time: startDate.toISOString(),
-      duration: duration || 60,
-      timezone: 'Europe/Istanbul',
-      agenda: description,
-      settings: {
-        host_video: true,
-        participant_video: true,
-        join_before_host: true,
-        mute_upon_entry: false,
-        waiting_room: false,
-        auto_recording: 'none',
-      },
-    };
-    
-    console.log('Zoom API isteği gönderiliyor:', meetingData);
-    
-    const meetingResponse = await fetch('https://api.zoom.us/v2/users/me/meetings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${tokenData.access_token}`,
-        'Content-Type': 'application/json',
-        'X-API-Key': process.env.NEXT_PUBLIC_ZOOM_API_KEY || '',
-      },
-      body: JSON.stringify(meetingData),
-    });
-
-    console.log('Zoom yanıt durumu:', meetingResponse.status);
-    const meetingResponseData = await meetingResponse.json();
-    console.log('Zoom yanıt verisi:', meetingResponseData);
-
-    if (!meetingResponse.ok) {
-      throw new Error(`Zoom toplantısı oluşturulamadı: ${JSON.stringify(meetingResponseData)}`);
-    }
-
+    const meetingData = await response.json();
     return NextResponse.json({
-      joinUrl: meetingResponseData.join_url,
-      meetingId: meetingResponseData.id,
+      id: meetingData.id,
+      join_url: meetingData.join_url,
+      start_url: meetingData.start_url,
+      password: meetingData.password,
     });
-  } catch (error: any) {
-    console.error('Zoom API detaylı hata:', {
-      message: error.message,
-      stack: error.stack,
-      cause: error.cause
-    });
-    
+
+  } catch (error) {
+    console.error('Toplantı oluşturma hatası:', error);
     return NextResponse.json(
-      { 
-        error: error.message || 'Bir hata oluştu',
-        details: error.stack
+      { error: 'Toplantı oluşturulurken bir hata oluştu' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const meetingId = searchParams.get('meetingId');
+
+    if (!meetingId) {
+      return NextResponse.json(
+        { error: 'Meeting ID gerekli' },
+        { status: 400 }
+      );
+    }
+
+    const response = await fetch(`https://api.zoom.us/v2/meetings/${meetingId}`, {
+      headers: {
+        'Authorization': `Bearer ${generateZoomJWT()}`,
       },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Zoom API hatası:', error);
+      return NextResponse.json(
+        { error: 'Toplantı bilgileri alınamadı: ' + error.message },
+        { status: response.status }
+      );
+    }
+
+    const meetingData = await response.json();
+    return NextResponse.json(meetingData);
+
+  } catch (error) {
+    console.error('Toplantı bilgileri alma hatası:', error);
+    return NextResponse.json(
+      { error: 'Toplantı bilgileri alınırken bir hata oluştu' },
       { status: 500 }
     );
   }
