@@ -4,6 +4,9 @@ import "./globals.css";
 import { LanguageProvider } from "@/lib/context/LanguageContext";
 import { ToastProvider } from '@/lib/context/ToastContext';
 
+// Firebase yapılandırmasını import et
+import '@/lib/firebase/config';
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {

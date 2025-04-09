@@ -1,10 +1,10 @@
-import { initializeApp, getApps } from 'firebase/app';
+import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
 // Doğrudan sabit değerleri kullanıyoruz
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyDi-ocPnlw8pc_gmkJORFPF2lUkj8Raz6w",
   authDomain: "yeniapp2-105be.firebaseapp.com",
   projectId: "yeniapp2-105be",
@@ -14,8 +14,12 @@ const firebaseConfig = {
   measurementId: "G-5RY6PJVJPH"
 };
 
+// Debug için log ekleme
+console.log("Firebase Config:", firebaseConfig);
+console.log("Environment:", process.env.NODE_ENV);
+
 // Firebase'i başlat
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+export const app = initializeApp(firebaseConfig);
 
 // Firestore, Auth ve Storage servislerini başlat
 export const db = getFirestore(app);
