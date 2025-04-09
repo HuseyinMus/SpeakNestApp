@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/context/LanguageContext";
 import { ToastProvider } from '@/lib/context/ToastContext';
-import ZoomEventListener from "@/components/ZoomEventListener";
+// import ZoomEventListener from "@/components/ZoomEventListener";
 
 // Firebase yapılandırmasını import et
 import '@/lib/firebase/config';
@@ -25,9 +25,9 @@ export default function RootLayout({
       <body className={inter.className}>
         <LanguageProvider>
           <ToastProvider>
-            <ZoomEventListener>
+            {/* <ZoomEventListener> */}
               {children}
-            </ZoomEventListener>
+            {/* </ZoomEventListener> */}
           </ToastProvider>
         </LanguageProvider>
       </body>

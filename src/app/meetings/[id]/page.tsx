@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import ChatBox from '@/components/ChatBox';
+// import ChatBox from '@/components/ChatBox';
 import { useAuth } from '@/lib/hooks/useAuth';
-import SocketService from '@/lib/services/SocketService';
+// import SocketService from '@/lib/services/SocketService';
 import { ZoomService } from '@/lib/services/ZoomService';
 
 export default function MeetingPage() {
@@ -36,7 +36,8 @@ export default function MeetingPage() {
     fetchMeetingData();
   }, [meetingId]);
 
-  // Kullanıcı katılınca odaya katıl ve katılımcıları dinle
+  // WebSocket fonksiyonlarını devre dışı bırak
+  /* 
   useEffect(() => {
     if (!user || !meetingId) return;
     
@@ -47,16 +48,13 @@ export default function MeetingPage() {
         await socketService.connect(user.uid, user.displayName || 'İsimsiz Kullanıcı');
         socketService.joinRoom(meetingId, user.uid, user.displayName || 'İsimsiz Kullanıcı');
         
-        // Kullanıcı katılma olayını dinle
         socketService.on('userJoined', (data: any) => {
           setParticipants(prev => {
-            // Eğer kullanıcı zaten listedeyse ekleme
             if (prev.some(p => p.userId === data.userId)) return prev;
             return [...prev, { userId: data.userId, userName: data.userName }];
           });
         });
         
-        // Kullanıcı ayrılma olayını dinle
         socketService.on('userLeft', (data: any) => {
           setParticipants(prev => 
             prev.filter(p => p.userId !== data.userId)
@@ -69,13 +67,13 @@ export default function MeetingPage() {
     
     setupSocketListeners();
     
-    // Cleanup
     return () => {
       socketService.leaveRoom(meetingId, user.uid, user.displayName || 'İsimsiz Kullanıcı');
       socketService.off('userJoined');
       socketService.off('userLeft');
     };
   }, [user, meetingId]);
+  */
 
   if (loading || loadingMeeting) {
     return (
@@ -160,6 +158,8 @@ export default function MeetingPage() {
             </div>
           </div>
           
+          {/* Sohbet kısmını devre dışı bırak */}
+          {/*
           <div>
             <button 
               onClick={() => setIsChatOpen(!isChatOpen)} 
@@ -169,6 +169,7 @@ export default function MeetingPage() {
             </button>
             {isChatOpen && <ChatBox roomId={meetingId} />}
           </div>
+          */}
         </div>
       </div>
     </div>

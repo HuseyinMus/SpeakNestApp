@@ -746,8 +746,21 @@ function CreateMeetingForm({ userId, userProfile, setActiveTab }: CreateMeetingF
         throw new Error(errorMsg);
       }
       
-      // Tarih bilgisini oluşturma
-      const meetingDateTime = new Date(`${formData.date}T${formData.time}`);
+      // Tarih bilgisini manuel olarak parçalara ayırarak oluştur
+      const [year, month, day] = formData.date.split('-').map(Number);
+      const [hours, minutes] = formData.time.split(':').map(Number);
+      
+      // Yeni tarih nesnesi oluştur
+      const meetingDateTime = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0));
+      
+      console.log('Oluşturulan tarih bilgileri:', {
+        date: formData.date,
+        time: formData.time,
+        parsedDate: `${year}-${month}-${day}`,
+        parsedTime: `${hours}:${minutes}`,
+        utcDate: meetingDateTime.toISOString(),
+        localDate: meetingDateTime.toString()
+      });
       
       if (meetingDateTime < new Date()) {
         const errorMsg = t('futureDateRequired', 'Toplantı tarihi gelecekte olmalıdır.');
@@ -762,58 +775,89 @@ function CreateMeetingForm({ userId, userProfile, setActiveTab }: CreateMeetingF
         throw new Error(errorMsg);
       }
       
-      // MeetingService'i import et
-      // Normalde bu import üstte olmalı, ancak dosyayı tamamen değiştirmemek için burada tutuyoruz
-      const { MeetingService } = await import('@/lib/services/MeetingService');
-      
-      // Toplantı verilerini hazırla
-      const meetingData = {
-        title: formData.title,
-        description: formData.description,
-        startTime: meetingDateTime,
-        level: formData.level,
-        topic: formData.topic,
-        participantCount: formData.participantCount,
-        keywords: formData.keywords,
-        questions: formData.questions,
-        hostId: userId || '',
-        hostName: userProfile?.displayName || `${userProfile?.firstName} ${userProfile?.lastName}`,
-        hostPhotoURL: userProfile?.photoURL || null,
-        participants: [] // Zorunlu alan
-      };
-      
-      // Toplantıyı oluştur
-      const meetingId = await MeetingService.createMeeting(meetingData);
-      
-      // Başarılı mesajı göster
-      const successMsg = t('meetingCreateSuccess', 'Toplantı başarıyla oluşturuldu!');
-      toast.success(successMsg);
-      
-      setFormData({
-        title: '',
-        description: '',
-        date: '',
-        time: '',
-        level: 'intermediate',
-        topic: 'daily',
-        participantCount: 6,
-        keywords: [],
-        questions: [],
-        isSubmitting: false,
-        error: '',
-        success: successMsg
-      });
-      
-      // Aktif toplantıları yeniden yükle - ProUserPanel bileşenindeki fetchMeetingData'ya erişemiyoruz
-      // ProUserPanel bileşeninde bir callback ile bu sorunu çözebiliriz
-      // Şimdilik formu sıfırladıktan sonra takvimdeki toplantıları görüntüleyelim
-      setActiveTab('my-meetings');
-      
-      // 3 saniye sonra başarı mesajını temizle
-      setTimeout(() => {
-        setFormData(prev => ({ ...prev, success: '' }));
-      }, 3000);
-      
+      try {
+        // Zoom API'si üzerinden doğrudan toplantı oluştur
+        const { ZoomService } = await import('@/lib/services/ZoomService');
+        
+        // Manuel olarak parametreleri kontrol et ve hata yoksa devam et
+        if (!formData.title || !formData.description || !meetingDateTime) {
+          throw new Error('Form bilgilerini kontrol edin. Başlık, açıklama ve tarih alanları zorunludur.');
+        }
+        
+        // Zoom toplantısı oluştur
+        console.log('ZoomService.createMeeting çağrılıyor:', {
+          title: formData.title,
+          descriptionLength: formData.description ? formData.description.length : 0,
+          startTime: meetingDateTime.toISOString(),
+          dateIsValid: meetingDateTime instanceof Date && !isNaN(meetingDateTime.getTime())
+        });
+        
+        const zoomResult = await ZoomService.createMeeting(
+          formData.title,
+          formData.description || "Açıklama yok", // Boş olmamalı
+          meetingDateTime.toISOString(), // Direkt ISO formatında string gönder
+          60 // varsayılan 1 saat
+        );
+        
+        if (zoomResult && zoomResult.joinUrl && zoomResult.meetingId) {
+          // Toplantıyı Firestore'a kaydet
+          const meetingRef = await addDoc(collection(db, 'meetings'), {
+            title: formData.title,
+            description: formData.description,
+            startTime: meetingDateTime,
+            level: formData.level,
+            topic: formData.topic,
+            participantCount: formData.participantCount,
+            keywords: formData.keywords,
+            questions: formData.questions,
+            hostId: userId || '',
+            hostName: userProfile?.displayName || `${userProfile?.firstName} ${userProfile?.lastName}`,
+            hostPhotoURL: userProfile?.photoURL || null,
+            status: 'active',
+            participants: [],
+            meetUrl: zoomResult.joinUrl,
+            zoomMeetingId: zoomResult.meetingId,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+          
+          console.log('Toplantı oluşturuldu, ID:', meetingRef.id);
+          
+          // Başarılı mesajı göster
+          const successMsg = t('meetingCreateSuccess', 'Toplantı başarıyla oluşturuldu!');
+          toast.success(successMsg);
+          
+          setFormData({
+            title: '',
+            description: '',
+            date: '',
+            time: '',
+            level: 'intermediate',
+            topic: 'daily',
+            participantCount: 6,
+            keywords: [],
+            questions: [],
+            isSubmitting: false,
+            error: '',
+            success: successMsg
+          });
+          
+          // Toplantı sayfasına yönlendir
+          setActiveTab('my-meetings');
+        } else {
+          throw new Error('Zoom toplantısı oluşturulamadı');
+        }
+      } catch (error: any) {
+        console.error('Toplantı oluşturulurken hata:', error);
+        const errorMsg = error.message || t('meetingCreateError', 'Toplantı oluşturulurken bir hata oluştu.');
+        toast.error(errorMsg);
+        
+        setFormData(prev => ({ 
+          ...prev, 
+          isSubmitting: false, 
+          error: errorMsg
+        }));
+      }
     } catch (error: any) {
       console.error('Toplantı oluşturulurken hata:', error);
       const errorMsg = error.message || t('meetingCreateError', 'Toplantı oluşturulurken bir hata oluştu.');

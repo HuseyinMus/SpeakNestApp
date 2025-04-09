@@ -12,22 +12,34 @@ export class ZoomService {
     duration: number = 60
   ) {
     try {
+      // Debug: Parametreleri ve tiplerini kontrol et
+      console.log('ZoomService.createMeeting parametreleri:', {
+        title: typeof title === 'undefined' ? 'undefined' : title,
+        description: typeof description === 'undefined' ? 'undefined' : description,
+        startTime: startTime instanceof Date ? startTime.toISOString() : 'geçersiz tarih',
+        duration
+      });
+
       // Parametreleri kontrol et
       if (!title || !description || !startTime) {
         throw new Error('Gerekli alanlar eksik: title, description ve startTime zorunludur');
       }
+
+      // Debug: API isteği içeriği
+      const requestBody = {
+        title,
+        description,
+        startTime: startTime.toISOString(),
+        duration,
+      };
+      console.log('ZoomService API isteği:', requestBody);
 
       const response = await fetch(`${this.API_BASE}/meetings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          title,
-          description,
-          startTime: startTime.toISOString(),
-          duration,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
