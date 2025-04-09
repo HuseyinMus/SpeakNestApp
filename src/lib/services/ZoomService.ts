@@ -1,5 +1,6 @@
 export class ZoomService {
-  private static FUNCTIONS_URL = process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_URL || '';
+  // API rotalarımızı kullanacak şekilde değiştiriyoruz
+  private static API_BASE = '/api/zoom';
 
   /**
    * Zoom toplantısı oluşturur
@@ -16,7 +17,7 @@ export class ZoomService {
         throw new Error('Gerekli alanlar eksik: title, description ve startTime zorunludur');
       }
 
-      const response = await fetch(`${this.FUNCTIONS_URL}/createMeeting`, {
+      const response = await fetch(`${this.API_BASE}/meetings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -24,7 +25,7 @@ export class ZoomService {
         body: JSON.stringify({
           title,
           description,
-          startTime,
+          startTime: startTime.toISOString(),
           duration,
         }),
       });
@@ -55,7 +56,7 @@ export class ZoomService {
         throw new Error('Meeting ID gerekli');
       }
 
-      const response = await fetch(`${this.FUNCTIONS_URL}/getMeeting?meetingId=${meetingId}`, {
+      const response = await fetch(`${this.API_BASE}/meetings/${meetingId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
