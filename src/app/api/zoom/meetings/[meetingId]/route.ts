@@ -1,14 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
-// Statik dışa aktarım için gerekli yapılandırma
-export const dynamic = 'force-static';
-export const revalidate = false;
+// Dynamic API route yapılandırması
+export const runtime = 'nodejs';
 
 export async function GET(
-  request: NextRequest,
-  context: { params: { meetingId: string } }
+  request: Request,
+  { params }: { params: { meetingId: string } }
 ) {
   try {
+    const meetingId = params.meetingId;
+    
+    if (!meetingId) {
+      return NextResponse.json({ error: 'Meeting ID gerekli' }, { status: 400 });
+    }
+    
     // Token al
     const tokenResponse = await fetch('https://zoom.us/oauth/token', {
       method: 'POST',
@@ -24,31 +29,38 @@ export async function GET(
     });
 
     if (!tokenResponse.ok) {
-      throw new Error('Token alınamadı');
+      const tokenError = await tokenResponse.json();
+      throw new Error(`Token alınamadı: ${JSON.stringify(tokenError)}`);
     }
 
     const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.access_token;
+    console.log('Token alındı');
 
-    // Toplantı bilgilerini al
-    const meetingResponse = await fetch(`https://api.zoom.us/v2/meetings/${context.params.meetingId}`, {
+    // Toplantı bilgilerini getir
+    const meetingResponse = await fetch(`https://api.zoom.us/v2/meetings/${meetingId}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Bearer ${tokenData.access_token}`,
         'Content-Type': 'application/json',
       },
     });
 
     if (!meetingResponse.ok) {
-      throw new Error('Toplantı bilgileri alınamadı');
+      const errorData = await meetingResponse.json();
+      throw new Error(`Toplantı bilgileri alınamadı: ${JSON.stringify(errorData)}`);
     }
 
     const meetingData = await meetingResponse.json();
+    
     return NextResponse.json(meetingData);
   } catch (error: any) {
     console.error('Toplantı bilgileri alma hatası:', error);
+    
     return NextResponse.json(
-      { error: error.message || 'Bir hata oluştu' },
+      { 
+        error: error.message || 'Toplantı bilgileri alınamadı',
+        details: error.stack 
+      },
       { status: 500 }
     );
   }

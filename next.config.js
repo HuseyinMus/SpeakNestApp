@@ -10,8 +10,7 @@ const nextConfig = {
   images: {
     domains: ['lh3.googleusercontent.com'],
     unoptimized: true
-  },
-  // API rotalarının çalışması için export ve distDir ayarlarını kaldırıyorum
+  }
 }
 
 module.exports = nextConfig 

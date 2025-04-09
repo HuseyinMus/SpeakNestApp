@@ -123,7 +123,7 @@ export class MeetingService {
       const meetings: MeetingData[] = [];
       
       snapshot.forEach((doc) => {
-        meetings.push({ id: doc.id, ...doc.data() } as MeetingData);
+        meetings.push({ id: doc.id, ...(doc.data() as Record<string, unknown>) } as MeetingData);
       });
       
       return meetings;

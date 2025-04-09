@@ -15,7 +15,9 @@
     "indexes": "firestore.indexes.json"
   },
   "hosting": {
-    "public": "out",
+    "predeploy": "npm run build",
+    "target": "default",
+    "public": "public",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -25,17 +27,6 @@
       {
         "source": "**",
         "destination": "/index.html"
-      }
-    ],
-    "headers": [
-      {
-        "source": "**",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "public, max-age=31536000"
-          }
-        ]
       }
     ]
   },
@@ -51,7 +42,7 @@
         "*.local"
       ],
       "predeploy": [
-        "npm --prefix \"$RESOURCE_DIR\" run lint"
+        "npm --prefix \"$RESOURCE_DIR\" run build"
       ]
     }
   ]
