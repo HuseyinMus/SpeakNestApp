@@ -10,9 +10,20 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
     const challenge = searchParams.get('challenge');
+    const error = searchParams.get('error');
+    const error_description = searchParams.get('error_description');
+
+    console.log('Gelen parametreler:', { code, challenge, error, error_description });
+
+    // Eğer error varsa, hata döndür
+    if (error) {
+      console.error('OAuth hatası:', { error, error_description });
+      throw new Error(`OAuth hatası: ${error_description || error}`);
+    }
 
     // Eğer challenge varsa, webhook doğrulama isteği
     if (challenge) {
+      console.log('Challenge isteği alındı:', challenge);
       return new NextResponse(challenge, {
         headers: { 'Content-Type': 'text/plain' },
       });
@@ -20,8 +31,13 @@ export async function GET(request: Request) {
 
     // Eğer code yoksa hata döndür
     if (!code) {
+      console.error('Authorization code bulunamadı');
       throw new Error('Authorization code bulunamadı');
     }
+
+    console.log('Token almaya çalışılıyor...');
+    console.log('Client ID:', process.env.NEXT_PUBLIC_ZOOM_CLIENT_ID);
+    console.log('Redirect URI:', `${process.env.NEXT_PUBLIC_APP_URL}/api/zoom/callback`);
 
     // Token al
     const tokenResponse = await fetch('https://zoom.us/oauth/token', {
@@ -39,20 +55,28 @@ export async function GET(request: Request) {
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.json();
-      console.error('Token alma hatası:', errorData);
-      throw new Error(`Token alınamadı: ${errorData.message || 'Bilinmeyen hata'}`);
+      console.error('Token alma hatası:', {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        error: errorData
+      });
+      throw new Error(`Token alınamadı: ${JSON.stringify(errorData)}`);
     }
 
-    await tokenResponse.json(); // Sadece response'u tüketmek için
+    await tokenResponse.json();
     console.log('Token başarıyla alındı');
 
     // Başarılı yönlendirme
     return NextResponse.redirect(new URL('/prouser-panel', request.url));
 
-  } catch (error) {
-    console.error('OAuth callback hatası:', error);
+  } catch (error: any) {
+    console.error('OAuth callback detaylı hata:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     // Hata durumunda ana sayfaya yönlendir
-    return NextResponse.redirect(new URL('/?error=oauth_failed', request.url));
+    return NextResponse.redirect(new URL(`/?error=oauth_failed&message=${encodeURIComponent(error.message)}`, request.url));
   }
 }
 

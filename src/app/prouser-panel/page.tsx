@@ -656,6 +656,7 @@ function CreateMeetingForm({ userId, userProfile, setActiveTab }: CreateMeetingF
   const { t } = useLanguage();
   const toast = useToast();
   const router = useRouter();
+  const [isZoomConnected, setIsZoomConnected] = useState(false);
   
   // Form State
   const [formData, setFormData] = useState<MeetingFormData>({
@@ -870,6 +871,16 @@ function CreateMeetingForm({ userId, userProfile, setActiveTab }: CreateMeetingF
     }
   };
   
+  const handleZoomConnect = () => {
+    const ZOOM_CLIENT_ID = 'j4qbt1vUQOCJpmwWwaDt8g';
+    const REDIRECT_URI = `${process.env.NEXT_PUBLIC_APP_URL}/api/zoom/callback`;
+    const RESPONSE_TYPE = 'code';
+    
+    const authUrl = `https://zoom.us/oauth/authorize?response_type=${RESPONSE_TYPE}&client_id=${ZOOM_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+    
+    window.location.href = authUrl;
+  };
+  
   // Konu seçenekleri
   const topicOptions = [
     { value: 'daily', label: t('dailyConversation', 'Günlük Konuşma') },
@@ -905,273 +916,282 @@ function CreateMeetingForm({ userId, userProfile, setActiveTab }: CreateMeetingF
         <p className="text-white/80">{t('createMeetingDescription', 'Yeni bir İngilizce pratik toplantısı oluşturun ve konuşma sunucusu olarak katılımcılara yardımcı olun.')}</p>
       </div>
       
-      {/* Form */}
-      <div className="bg-white p-8 shadow-md rounded-xl">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Başlık ve Açıklama */}
-          <div className="grid md:grid-cols-2 gap-6">
+      {!isZoomConnected && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-yellow-700 mb-2">Toplantı oluşturmak için önce Zoom ile bağlanmanız gerekiyor.</p>
+          <button
+            onClick={handleZoomConnect}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors"
+          >
+            Zoom ile Bağlan
+          </button>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Başlık ve Açıklama */}
+        <div className="grid md:grid-cols-2 gap-6">
+          <div>
+            <label htmlFor="title" className="block text-sm font-medium text-slate-700 mb-2">
+              {t('meetingTitle', 'Toplantı Başlığı')} *
+            </label>
+            <input
+              type="text"
+              id="title"
+              name="title"
+              value={formData.title}
+              onChange={handleChange}
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              placeholder={t('meetingTitlePlaceholder', 'Örn: Günlük Konuşma Pratiği')}
+              required
+            />
+          </div>
+          <div>
+            <label htmlFor="description" className="block text-sm font-medium text-slate-700 mb-2">
+              {t('meetingDescription', 'Toplantı Açıklaması')}
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              rows={3}
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              placeholder={t('meetingDescriptionPlaceholder', 'Bu toplantıda neler konuşulacak?')}
+            />
+          </div>
+        </div>
+        
+        {/* Tarih, Saat, Seviye ve Konu */}
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="title" className="block text-sm font-medium text-slate-700 mb-2">
-                {t('meetingTitle', 'Toplantı Başlığı')} *
+              <label htmlFor="date" className="block text-sm font-medium text-slate-700 mb-2">
+                {t('meetingDate', 'Toplantı Tarihi')} *
               </label>
               <input
-                type="text"
-                id="title"
-                name="title"
-                value={formData.title}
+                type="date"
+                id="date"
+                name="date"
+                value={formData.date}
                 onChange={handleChange}
                 className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                placeholder={t('meetingTitlePlaceholder', 'Örn: Günlük Konuşma Pratiği')}
+                required
+                min={new Date().toISOString().split('T')[0]} // Bugün ve sonrası için
+              />
+            </div>
+            <div>
+              <label htmlFor="time" className="block text-sm font-medium text-slate-700 mb-2">
+                {t('meetingTime', 'Toplantı Saati')} *
+              </label>
+              <input
+                type="time"
+                id="time"
+                name="time"
+                value={formData.time}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                 required
               />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-slate-700 mb-2">
-                {t('meetingDescription', 'Toplantı Açıklaması')}
+              <label htmlFor="level" className="block text-sm font-medium text-slate-700 mb-2">
+                {t('level', 'Seviye')}
               </label>
-              <textarea
-                id="description"
-                name="description"
-                value={formData.description}
+              <select
+                id="level"
+                name="level"
+                value={formData.level}
                 onChange={handleChange}
-                rows={3}
                 className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                placeholder={t('meetingDescriptionPlaceholder', 'Bu toplantıda neler konuşulacak?')}
-              />
+              >
+                {levelOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          </div>
-          
-          {/* Tarih, Saat, Seviye ve Konu */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="date" className="block text-sm font-medium text-slate-700 mb-2">
-                  {t('meetingDate', 'Toplantı Tarihi')} *
-                </label>
-                <input
-                  type="date"
-                  id="date"
-                  name="date"
-                  value={formData.date}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  required
-                  min={new Date().toISOString().split('T')[0]} // Bugün ve sonrası için
-                />
-              </div>
-              <div>
-                <label htmlFor="time" className="block text-sm font-medium text-slate-700 mb-2">
-                  {t('meetingTime', 'Toplantı Saati')} *
-                </label>
-                <input
-                  type="time"
-                  id="time"
-                  name="time"
-                  value={formData.time}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  required
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="level" className="block text-sm font-medium text-slate-700 mb-2">
-                  {t('level', 'Seviye')}
-                </label>
-                <select
-                  id="level"
-                  name="level"
-                  value={formData.level}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                >
-                  {levelOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="topic" className="block text-sm font-medium text-slate-700 mb-2">
-                  {t('topic', 'Konu')}
-                </label>
-                <select
-                  id="topic"
-                  name="topic"
-                  value={formData.topic}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                >
-                  {topicOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-          
-          {/* Katılımcı Sayısı */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
-              <label htmlFor="participantCount" className="block text-sm font-medium text-slate-700 mb-3 flex items-center justify-between">
-                <span>{t('participantCount', 'Katılımcı Sayısı')}</span>
-                <span className="text-lg font-medium text-blue-700 px-3 py-1 bg-blue-100 rounded-full">
-                  {formData.participantCount}
-                </span>
+            <div>
+              <label htmlFor="topic" className="block text-sm font-medium text-slate-700 mb-2">
+                {t('topic', 'Konu')}
               </label>
-              <div className="flex items-center">
-                <input
-                  type="range"
-                  id="participantCount"
-                  name="participantCount"
-                  value={formData.participantCount}
-                  onChange={handleChange}
-                  min="3"
-                  max="6"
-                  className="w-full accent-blue-600"
-                />
-              </div>
-              <p className="text-xs text-slate-500 mt-2">{t('participantCountHelp', 'Toplantıya katılabilecek kişi sayısı (3-6 arası)')}</p>
-            </div>
-          </div>
-          
-          {/* Anahtar Kelimeler */}
-          <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
-            <label className="block text-sm font-medium text-slate-700 mb-3">
-              {t('keywords', 'Anahtar Kelimeler')}
-            </label>
-            <div className="flex gap-2 mb-3">
-              <input
-                type="text"
-                value={currentKeyword}
-                onChange={(e) => setCurrentKeyword(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addKeyword())}
-                className="flex-1 px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                placeholder={t('keywordPlaceholder', 'Yeni anahtar kelime ekle')}
-              />
-              <button
-                type="button"
-                onClick={addKeyword}
-                className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg hover:from-blue-700 hover:to-indigo-800 transition-colors shadow-sm flex items-center justify-center"
+              <select
+                id="topic"
+                name="topic"
+                value={formData.topic}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
               >
-                <Plus size={18} />
-              </button>
-            </div>
-            {formData.keywords.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {formData.keywords.map((keyword, index) => (
-                  <div
-                    key={index}
-                    className="px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full flex items-center gap-1.5 text-sm"
-                  >
-                    {keyword}
-                    <button
-                      type="button"
-                      onClick={() => removeKeyword(keyword)}
-                      className="text-blue-600 hover:text-blue-800 focus:outline-none"
-                    >
-                      <MinusCircle size={16} />
-                    </button>
-                  </div>
+                {topicOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
                 ))}
-              </div>
-            )}
+              </select>
+            </div>
           </div>
-          
-          {/* Konu Soruları */}
+        </div>
+        
+        {/* Katılımcı Sayısı */}
+        <div className="grid md:grid-cols-2 gap-6">
           <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
-            <label className="block text-sm font-medium text-slate-700 mb-3">
-              {t('topicQuestions', 'Konu Soruları')}
+            <label htmlFor="participantCount" className="block text-sm font-medium text-slate-700 mb-3 flex items-center justify-between">
+              <span>{t('participantCount', 'Katılımcı Sayısı')}</span>
+              <span className="text-lg font-medium text-blue-700 px-3 py-1 bg-blue-100 rounded-full">
+                {formData.participantCount}
+              </span>
             </label>
-            <div className="flex gap-2 mb-3">
+            <div className="flex items-center">
               <input
-                type="text"
-                value={currentQuestion}
-                onChange={(e) => setCurrentQuestion(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addQuestion())}
-                className="flex-1 px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                placeholder={t('questionPlaceholder', 'Toplantıda sorulacak bir soru ekle')}
+                type="range"
+                id="participantCount"
+                name="participantCount"
+                value={formData.participantCount}
+                onChange={handleChange}
+                min="3"
+                max="6"
+                className="w-full accent-blue-600"
               />
-              <button
-                type="button"
-                onClick={addQuestion}
-                className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg hover:from-blue-700 hover:to-indigo-800 transition-colors shadow-sm flex items-center justify-center"
-              >
-                <Plus size={18} />
-              </button>
             </div>
-            {formData.questions.length > 0 && (
-              <div className="space-y-2 mt-3">
-                {formData.questions.map((question, index) => (
-                  <div
-                    key={index}
-                    className="px-4 py-2.5 bg-white border border-slate-200 text-slate-800 rounded-lg flex items-center justify-between text-sm shadow-sm"
-                  >
-                    <span>{question}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeQuestion(question)}
-                      className="text-slate-600 hover:text-red-600 focus:outline-none"
-                    >
-                      <MinusCircle size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+            <p className="text-xs text-slate-500 mt-2">{t('participantCountHelp', 'Toplantıya katılabilecek kişi sayısı (3-6 arası)')}</p>
           </div>
-          
-          {/* Hata/Başarı Mesajları */}
-          {formData.error && (
-            <div className="px-4 py-3 bg-red-100 text-red-800 rounded-lg border border-red-200 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-alert-circle">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" x2="12" y1="8" y2="12" />
-                <line x1="12" x2="12.01" y1="16" y2="16" />
-              </svg>
-              {formData.error}
-            </div>
-          )}
-          
-          {formData.success && (
-            <div className="px-4 py-3 bg-green-100 text-green-800 rounded-lg border border-green-200 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check-circle">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-              {formData.success}
-            </div>
-          )}
-          
-          {/* Gönderme Butonu */}
-          <div className="pt-6 border-t border-slate-200 flex justify-end">
+        </div>
+        
+        {/* Anahtar Kelimeler */}
+        <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
+          <label className="block text-sm font-medium text-slate-700 mb-3">
+            {t('keywords', 'Anahtar Kelimeler')}
+          </label>
+          <div className="flex gap-2 mb-3">
+            <input
+              type="text"
+              value={currentKeyword}
+              onChange={(e) => setCurrentKeyword(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addKeyword())}
+              className="flex-1 px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              placeholder={t('keywordPlaceholder', 'Yeni anahtar kelime ekle')}
+            />
             <button
-              type="submit"
-              disabled={formData.isSubmitting}
-              className={`px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg font-medium shadow-md hover:from-blue-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 flex items-center gap-2 ${formData.isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+              type="button"
+              onClick={addKeyword}
+              className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg hover:from-blue-700 hover:to-indigo-800 transition-colors shadow-sm flex items-center justify-center"
             >
-              {formData.isSubmitting ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  {t('creating', 'Oluşturuluyor...')}
-                </>
-              ) : (
-                <>
-                  <Calendar size={18} />
-                  {t('createMeeting', 'Toplantı Oluştur')}
-                </>
-              )}
+              <Plus size={18} />
             </button>
           </div>
-        </form>
-      </div>
+          {formData.keywords.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {formData.keywords.map((keyword, index) => (
+                <div
+                  key={index}
+                  className="px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full flex items-center gap-1.5 text-sm"
+                >
+                  {keyword}
+                  <button
+                    type="button"
+                    onClick={() => removeKeyword(keyword)}
+                    className="text-blue-600 hover:text-blue-800 focus:outline-none"
+                  >
+                    <MinusCircle size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {/* Konu Soruları */}
+        <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
+          <label className="block text-sm font-medium text-slate-700 mb-3">
+            {t('topicQuestions', 'Konu Soruları')}
+          </label>
+          <div className="flex gap-2 mb-3">
+            <input
+              type="text"
+              value={currentQuestion}
+              onChange={(e) => setCurrentQuestion(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addQuestion())}
+              className="flex-1 px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              placeholder={t('questionPlaceholder', 'Toplantıda sorulacak bir soru ekle')}
+            />
+            <button
+              type="button"
+              onClick={addQuestion}
+              className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg hover:from-blue-700 hover:to-indigo-800 transition-colors shadow-sm flex items-center justify-center"
+            >
+              <Plus size={18} />
+            </button>
+          </div>
+          {formData.questions.length > 0 && (
+            <div className="space-y-2 mt-3">
+              {formData.questions.map((question, index) => (
+                <div
+                  key={index}
+                  className="px-4 py-2.5 bg-white border border-slate-200 text-slate-800 rounded-lg flex items-center justify-between text-sm shadow-sm"
+                >
+                  <span>{question}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeQuestion(question)}
+                    className="text-slate-600 hover:text-red-600 focus:outline-none"
+                  >
+                    <MinusCircle size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {/* Hata/Başarı Mesajları */}
+        {formData.error && (
+          <div className="px-4 py-3 bg-red-100 text-red-800 rounded-lg border border-red-200 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-alert-circle">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" x2="12" y1="8" y2="12" />
+              <line x1="12" x2="12.01" y1="16" y2="16" />
+            </svg>
+            {formData.error}
+          </div>
+        )}
+        
+        {formData.success && (
+          <div className="px-4 py-3 bg-green-100 text-green-800 rounded-lg border border-green-200 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check-circle">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+            {formData.success}
+          </div>
+        )}
+        
+        {/* Gönderme Butonu */}
+        <div className="pt-6 border-t border-slate-200 flex justify-end">
+          <button
+            type="submit"
+            disabled={formData.isSubmitting}
+            className={`px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg font-medium shadow-md hover:from-blue-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 flex items-center gap-2 ${formData.isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+          >
+            {formData.isSubmitting ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                {t('creating', 'Oluşturuluyor...')}
+              </>
+            ) : (
+              <>
+                <Calendar size={18} />
+                {t('createMeeting', 'Toplantı Oluştur')}
+              </>
+            )}
+          </button>
+        </div>
+      </form>
     </div>
   );
 } 
