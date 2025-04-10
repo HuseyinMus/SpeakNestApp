@@ -16,6 +16,21 @@ function generateZoomJWT(): string {
   return sign(payload, ZOOM_API_SECRET);
 }
 
+// URL oluşturma yardımcı fonksiyonu
+function createApiUrl(path: string): string {
+  // URL sınıfı kullanmadan string birleştirme ile URL oluştur
+  // URL sınıfı client-side'da bazen sorunlara neden olabilir
+  // BASE_URL sonunda / olup olmadığını kontrol et
+  const baseWithSlash = BASE_URL.endsWith('/') ? BASE_URL : `${BASE_URL}/`;
+  // API_PATH başında / olup olmadığını kontrol et
+  const apiPath = API_PATH.startsWith('/') ? API_PATH.substring(1) : API_PATH;
+  // path başında / olup olmadığını kontrol et
+  const pathWithoutSlash = path.startsWith('/') ? path.substring(1) : path;
+  
+  // URL'yi oluştur
+  return `${baseWithSlash}${apiPath}/${pathWithoutSlash}`;
+}
+
 export class ZoomService {
   /**
    * Zoom toplantısı oluşturur
@@ -27,8 +42,8 @@ export class ZoomService {
     duration?: number;
   }): Promise<ZoomMeetingResponse> {
     try {
-      // API endpoint URL'yi oluştur - absolute URL kullan
-      const apiUrl = new URL(`${API_PATH}/meetings`, BASE_URL).toString();
+      // Güvenli URL oluşturma fonksiyonunu kullan
+      const apiUrl = createApiUrl('meetings');
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -60,8 +75,8 @@ export class ZoomService {
     }
 
     try {
-      // API endpoint URL'yi oluştur - absolute URL kullan
-      const apiUrl = new URL(`${API_PATH}/meetings/${meetingId}`, BASE_URL).toString();
+      // Güvenli URL oluşturma fonksiyonunu kullan
+      const apiUrl = createApiUrl(`meetings/${meetingId}`);
       
       const response = await fetch(apiUrl, {
         headers: {
