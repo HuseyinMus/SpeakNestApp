@@ -3,35 +3,54 @@ import { NextResponse } from 'next/server';
 // Dynamic API route yapılandırması
 export const runtime = 'nodejs';
 
-// Zoom OAuth credentials
-const ZOOM_CLIENT_ID = 'j4qbt1vUQOCJpmwWwaDt8g';
-const ZOOM_CLIENT_SECRET = 'SmfLM35kaHUsKDJZWQbXor7j0kt90gUU';
-const ZOOM_ACCOUNT_ID = 'XaxQs_pZTtasDDQsHxl-LQ'; // Gerekirse Zoom hesap ID'nizi buraya ekleyin
+// Zoom OAuth credentials - Zoom Marketplace'ten alınan değerleri kullanın
+// Server-to-Server OAuth App bilgilerini buraya girin
+const ZOOM_CLIENT_ID = 'NvE9RqQfQtSKldqQ52Vg5g';
+const ZOOM_CLIENT_SECRET = 'FRO4MRhdGLwHHmRRBWHpNPTIl8AJ5SKn';
+const ZOOM_ACCOUNT_ID = 'FJDQQcUQReqEYHQZp4rGLQ';
 
 // Zoom OAuth token alma fonksiyonu
 async function getZoomAccessToken(): Promise<string> {
   try {
     console.log('Zoom OAuth token alınıyor...');
+    console.log('Kullanılan Account ID:', ZOOM_ACCOUNT_ID);
     
-    const tokenResponse = await fetch('https://zoom.us/oauth/token', {
+    // Tam URL'yi logla
+    const url = 'https://zoom.us/oauth/token';
+    console.log('Token isteği URL:', url);
+    
+    // URL encoded form data hazırla
+    const formData = new URLSearchParams({
+      'grant_type': 'account_credentials',
+      'account_id': ZOOM_ACCOUNT_ID
+    });
+    
+    console.log('Token isteği parametreleri:', formData.toString());
+    
+    // Token isteği yap
+    const tokenResponse = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Authorization': `Basic ${Buffer.from(`${ZOOM_CLIENT_ID}:${ZOOM_CLIENT_SECRET}`).toString('base64')}`
       },
-      body: new URLSearchParams({
-        'grant_type': 'account_credentials',
-        'account_id': ZOOM_ACCOUNT_ID
-      }).toString()
+      body: formData.toString()
     });
+    
+    console.log('Token yanıt durumu:', tokenResponse.status);
+    
+    // Yanıt metnini al
+    const responseText = await tokenResponse.text();
+    console.log('Token yanıt metni:', responseText);
     
     if (!tokenResponse.ok) {
       console.error('Zoom token alınamadı, status:', tokenResponse.status);
-      throw new Error(`Token alınamadı: ${tokenResponse.status}`);
+      throw new Error(`Token alınamadı: ${tokenResponse.status} - ${responseText}`);
     }
     
-    const tokenData = await tokenResponse.json();
-    console.log('Zoom token alındı, expires_in:', tokenData.expires_in);
+    // JSON'a dönüştür
+    const tokenData = JSON.parse(responseText);
+    console.log('Token bilgileri alındı, expires_in:', tokenData.expires_in);
     
     return tokenData.access_token;
   } catch (error) {
