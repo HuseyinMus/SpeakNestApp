@@ -42,8 +42,8 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     // URL validation event'i
     if (event === 'endpoint.url_validation') {
       const plainToken = payload?.plainToken;
-      // Sabit token değerini kullan
-      const secret = "M6JalqSsT6-aQyXQW4v3bQ";
+      // Zoom Dashboard'dan alınan Secret Token değeri
+      const secret = "7K23_C41SAesYthlX-kKyA";
       
       console.log("URL doğrulama isteği alındı, plainToken:", plainToken);
       console.log("Tam istek body:", JSON.stringify(req.body));
