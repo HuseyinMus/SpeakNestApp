@@ -3,15 +3,20 @@ import { NextResponse } from 'next/server';
 // Dynamic API route yapılandırması
 export const runtime = 'nodejs';
 
-// Zoom OAuth credentials - Sabit değerler
-const ZOOM_CLIENT_ID = 'j4qbt1vUQOCJpmwWwaDt8g';
-const ZOOM_CLIENT_SECRET = 'TGDhqevBjCuDuy3G3M4ByMhF0V8MOSGB';
-const ZOOM_ACCOUNT_ID = 'Ja4hERydSvy8zOUOrgJ_qQ';
+// Zoom OAuth credentials - Sadece ortam değişkenlerinden okuma
+const ZOOM_CLIENT_ID = process.env.ZOOM_CLIENT_ID || '';
+const ZOOM_CLIENT_SECRET = process.env.ZOOM_CLIENT_SECRET || '';
+const ZOOM_ACCOUNT_ID = process.env.ZOOM_ACCOUNT_ID || '';
 
 // Zoom OAuth token alma fonksiyonu
 async function getZoomAccessToken(): Promise<string> {
   try {
     console.log('Zoom OAuth token alınıyor...');
+    
+    // Kimlik bilgileri kontrolü
+    if (!ZOOM_CLIENT_ID || !ZOOM_CLIENT_SECRET || !ZOOM_ACCOUNT_ID) {
+      throw new Error('Zoom API kimlik bilgileri eksik. Lütfen ortam değişkenlerini kontrol edin.');
+    }
     
     // Tam URL'yi logla
     const url = 'https://zoom.us/oauth/token';
@@ -39,7 +44,13 @@ async function getZoomAccessToken(): Promise<string> {
     
     // Yanıt metnini al
     const responseText = await tokenResponse.text();
-    console.log('Token yanıt metni:', responseText);
+    
+    // Hassas bilgileri maskeleyerek logla
+    if (responseText.includes('access_token')) {
+      console.log('Token yanıt metni: [Hassas bilgiler - loglanmadı]');
+    } else {
+      console.log('Token yanıt metni:', responseText);
+    }
     
     if (!tokenResponse.ok) {
       console.error('Zoom token alınamadı, status:', tokenResponse.status);
