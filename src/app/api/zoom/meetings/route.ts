@@ -3,17 +3,15 @@ import { NextResponse } from 'next/server';
 // Dynamic API route yapılandırması
 export const runtime = 'nodejs';
 
-// Zoom OAuth credentials - Zoom Marketplace'ten alınan değerleri kullanın
-// Server-to-Server OAuth App bilgilerini buraya girin
-const ZOOM_CLIENT_ID = 'NvE9RqQfQtSKldqQ52Vg5g';
-const ZOOM_CLIENT_SECRET = 'FRO4MRhdGLwHHmRRBWHpNPTIl8AJ5SKn';
-const ZOOM_ACCOUNT_ID = 'FJDQQcUQReqEYHQZp4rGLQ';
+// Zoom OAuth credentials - Sabit değerler
+const ZOOM_CLIENT_ID = 'j4qbt1vUQOCJpmwWwaDt8g';
+const ZOOM_CLIENT_SECRET = 'TGDhqevBjCuDuy3G3M4ByMhF0V8MOSGB';
+const ZOOM_ACCOUNT_ID = 'Ja4hERydSvy8zOUOrgJ_qQ';
 
 // Zoom OAuth token alma fonksiyonu
 async function getZoomAccessToken(): Promise<string> {
   try {
     console.log('Zoom OAuth token alınıyor...');
-    console.log('Kullanılan Account ID:', ZOOM_ACCOUNT_ID);
     
     // Tam URL'yi logla
     const url = 'https://zoom.us/oauth/token';
