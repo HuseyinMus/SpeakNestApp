@@ -1,6 +1,8 @@
 import { sign } from 'jsonwebtoken';
 
-const API_BASE = '/api/zoom';
+// Baz URL - deployment environment'ına göre değişir
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://speak-nest-app.vercel.app';
+const API_PATH = '/api/zoom';
 const ZOOM_API_KEY = 'j4qbt1vUQOCJpmwWwaDt8g';
 const ZOOM_API_SECRET = 'SmfLM35kaHUsKDJZWQbXor7j0kt90gUU';
 
@@ -25,7 +27,10 @@ export class ZoomService {
     duration?: number;
   }): Promise<ZoomMeetingResponse> {
     try {
-      const response = await fetch(`${API_BASE}/meetings`, {
+      // API endpoint URL'yi oluştur - absolute URL kullan
+      const apiUrl = new URL(`${API_PATH}/meetings`, BASE_URL).toString();
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -55,7 +60,10 @@ export class ZoomService {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/meetings/${meetingId}`, {
+      // API endpoint URL'yi oluştur - absolute URL kullan
+      const apiUrl = new URL(`${API_PATH}/meetings/${meetingId}`, BASE_URL).toString();
+      
+      const response = await fetch(apiUrl, {
         headers: {
           'Authorization': `Bearer ${generateZoomJWT()}`,
         },
