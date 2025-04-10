@@ -46,7 +46,9 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       const secret = "M6JalqSsT6-aQyXQW4v3bQ";
       
       console.log("URL doğrulama isteği alındı, plainToken:", plainToken);
+      console.log("Tam istek body:", JSON.stringify(req.body));
       
+      // Zoom'un orijinal örneklerini takip eden şifreleme
       const encryptedToken = crypto
         .createHmac('sha256', secret)
         .update(plainToken)
@@ -54,10 +56,15 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       
       console.log("Şifrelenmiş token oluşturuldu:", encryptedToken);
       
-      return res.status(200).json({
+      // Yanıt objesi
+      const response = {
         plainToken,
         encryptedToken,
-      });
+      };
+      
+      console.log("Gönderilen yanıt:", JSON.stringify(response));
+      
+      return res.status(200).json(response);
     }
     
     // Diğer Zoom event'leri
