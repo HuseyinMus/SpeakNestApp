@@ -1,20 +1,43 @@
 import { NextResponse } from 'next/server';
-import { sign } from 'jsonwebtoken';
 
 // Dynamic API route yapılandırması
 export const runtime = 'nodejs';
 
-const ZOOM_API_KEY = 'j4qbt1vUQOCJpmwWwaDt8g';
-const ZOOM_API_SECRET = 'SmfLM35kaHUsKDJZWQbXor7j0kt90gUU';
+// Zoom OAuth credentials
+const ZOOM_CLIENT_ID = 'j4qbt1vUQOCJpmwWwaDt8g';
+const ZOOM_CLIENT_SECRET = 'SmfLM35kaHUsKDJZWQbXor7j0kt90gUU';
+const ZOOM_ACCOUNT_ID = 'XaxQs_pZTtasDDQsHxl-LQ'; // Gerekirse Zoom hesap ID'nizi buraya ekleyin
 
-// JWT token oluştur
-function generateZoomJWT(): string {
-  const payload = {
-    iss: ZOOM_API_KEY,
-    exp: Math.floor(Date.now() / 1000) + 60 * 60, // 1 saat geçerli
-  };
-
-  return sign(payload, ZOOM_API_SECRET);
+// Zoom OAuth token alma fonksiyonu
+async function getZoomAccessToken(): Promise<string> {
+  try {
+    console.log('Zoom OAuth token alınıyor...');
+    
+    const tokenResponse = await fetch('https://zoom.us/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${Buffer.from(`${ZOOM_CLIENT_ID}:${ZOOM_CLIENT_SECRET}`).toString('base64')}`
+      },
+      body: new URLSearchParams({
+        'grant_type': 'account_credentials',
+        'account_id': ZOOM_ACCOUNT_ID
+      }).toString()
+    });
+    
+    if (!tokenResponse.ok) {
+      console.error('Zoom token alınamadı, status:', tokenResponse.status);
+      throw new Error(`Token alınamadı: ${tokenResponse.status}`);
+    }
+    
+    const tokenData = await tokenResponse.json();
+    console.log('Zoom token alındı, expires_in:', tokenData.expires_in);
+    
+    return tokenData.access_token;
+  } catch (error) {
+    console.error('Token alma hatası:', error);
+    throw error;
+  }
 }
 
 export async function POST(request: Request) {
@@ -34,8 +57,8 @@ export async function POST(request: Request) {
       );
     }
     
-    const token = generateZoomJWT();
-    console.log('JWT token oluşturuldu');
+    // OAuth 2.0 ile token alınıyor
+    const accessToken = await getZoomAccessToken();
 
     // Zoom API'ye gönderilecek veri
     const zoomMeetingData = {
@@ -62,7 +85,7 @@ export async function POST(request: Request) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${accessToken}`,
       },
       body: JSON.stringify(zoomMeetingData),
     });
@@ -128,12 +151,12 @@ export async function GET(request: Request) {
       );
     }
 
-    const token = generateZoomJWT();
-    console.log('JWT token oluşturuldu');
+    // OAuth 2.0 ile token alınıyor
+    const accessToken = await getZoomAccessToken();
 
     const response = await fetch(`https://api.zoom.us/v2/meetings/${meetingId}`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${accessToken}`,
       },
     });
     
