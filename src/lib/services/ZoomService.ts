@@ -1,20 +1,6 @@
-import { sign } from 'jsonwebtoken';
-
-// Baz URL - deployment environment'ına göre değişir
+// JWT işlemleri kaldırıldı - server-side'da yapılacak
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://speak-nest-app.vercel.app';
 const API_PATH = '/api/zoom';
-const ZOOM_API_KEY = 'j4qbt1vUQOCJpmwWwaDt8g';
-const ZOOM_API_SECRET = 'SmfLM35kaHUsKDJZWQbXor7j0kt90gUU';
-
-// JWT token oluştur
-function generateZoomJWT(): string {
-  const payload = {
-    iss: ZOOM_API_KEY,
-    exp: Math.floor(Date.now() / 1000) + 60 * 60, // 1 saat geçerli
-  };
-
-  return sign(payload, ZOOM_API_SECRET);
-}
 
 // URL oluşturma yardımcı fonksiyonu
 function createApiUrl(path: string): string {
@@ -49,7 +35,6 @@ export class ZoomService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${generateZoomJWT()}`,
         },
         body: JSON.stringify(params),
       });
@@ -80,7 +65,7 @@ export class ZoomService {
       
       const response = await fetch(apiUrl, {
         headers: {
-          'Authorization': `Bearer ${generateZoomJWT()}`,
+          'Content-Type': 'application/json',
         },
       });
 
