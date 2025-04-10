@@ -27,9 +27,8 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     // URL validation event'i
     if (event === 'endpoint.url_validation') {
       const plainToken = payload?.plainToken;
-      // ZOOM_WEBHOOK_SECRET_TOKEN değerini .env.local dosyasından alıyoruz
-      // Bu değeri Zoom Developer Dashboard'dan webhook secret olarak almanız gerekiyor
-      const secret = process.env.ZOOM_WEBHOOK_SECRET_TOKEN || 'webhook-secret';
+      // Sabit token değerini kullan
+      const secret = "M6JalqSsT6-aQyXQW4v3bQ";
       
       console.log("URL doğrulama isteği alındı, plainToken:", plainToken);
       
