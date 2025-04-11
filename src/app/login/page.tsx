@@ -48,6 +48,8 @@ export default function LoginPage() {
           router.push('/teacher-panel');
         } else if (userData.role === 'proUser') {
           router.push('/prouser-panel');
+        } else if (userData.role === 'editor') {
+          router.push('/editor-panel');
         } else {
           // Varsayılan olarak öğrenci paneline yönlendir
           router.push('/student-panel');

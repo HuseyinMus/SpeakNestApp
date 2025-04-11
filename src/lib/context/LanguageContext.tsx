@@ -13,6 +13,7 @@ interface LanguageContextType {
   changeLanguage: (language: Language) => Promise<void>;
   t: (key: string, params?: any) => string; // Translation function
   languages: { code: Language; name: string }[];
+  setLanguage: (lang: Language) => void;
 }
 
 const defaultLanguage: Language = 'tr';
@@ -644,8 +645,13 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     checkUserLanguagePreference();
   }, []);
 
+  const setLanguage = (lang: Language) => {
+    setCurrentLanguage(lang);
+    // Burada localStorage'a kaydedilebilir
+  };
+
   return (
-    <LanguageContext.Provider value={{ currentLanguage, changeLanguage, t, languages }}>
+    <LanguageContext.Provider value={{ currentLanguage, changeLanguage, t, languages, setLanguage }}>
       {children}
     </LanguageContext.Provider>
   );
